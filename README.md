@@ -2,6 +2,10 @@
 
 Прототип команды **AI-NAM** для хакатона HackAlem, кейс «ИИ-агент „Анализ организационной структуры и функционала“».
 
+> В репозитории два приложения команды. Этот README описывает основное — **OrgStruct AI** (`backend/`, `frontend/`).
+> Второй, облегчённый прототип **AI-NAM** (`app/`, `web/`, `run.py`) запускается отдельно:
+> см. [раздел «Второй прототип: AI-NAM»](#второй-прототип-ai-nam) и [docs/AI-NAM.md](docs/AI-NAM.md).
+
 ![Результаты анализа документов организатора](docs/screenshots/organizer_analysis.png)
 
 ## Содержание
@@ -17,6 +21,8 @@
 9. [Данные и интеграции](#9-данные-и-интеграции)
 10. [Ограничения](#10-ограничения)
 11. [Deployed-версия](#11-deployed-версия)
+
+[Второй прототип: AI-NAM](#второй-прототип-ai-nam)
 
 ---
 
@@ -170,8 +176,15 @@ frontend/           React-интерфейс
 samples/demo/       синтетический контрольный комплект (генератор: scripts/make_demo.py)
 samples/organizer/  документы организатора: Положение о внутреннем аудите, ред. № 8 и № 9
 scripts/            генератор демо-данных, мок ИИ-модели, запуск dev/Windows
-docs/               ARCHITECTURE.md (алгоритмы), MODELS.md (подключение моделей), скриншоты
+docs/               ARCHITECTURE.md (алгоритмы), MODELS.md (подключение моделей), AI-NAM.md, скриншоты
 Dockerfile, docker-compose.yml, Makefile, .env.example, .github/workflows/ci.yml
+
+Второй прототип AI-NAM (не зависит от файлов выше):
+app/, web/, run.py  приложение и интерфейс
+tests/              тесты unittest
+deploy/             пример HTTPS reverse proxy (Caddy)
+scripts/backup.py, start.ps1, requirements.txt, requirements.lock.txt
+samples/audit-v8.docx, samples/audit-v9.docx  документы организатора (копия samples/organizer)
 ```
 
 Подробное описание алгоритмов, модели данных и эндпоинтов: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -298,8 +311,8 @@ make test      # 20 тестов pytest
 
 Тесты проверяют разбор нумерации и сокращений, оба контрольных сценария, сквозной сценарий через HTTP API
 (загрузка → анализ → проверка вывода → заключение KZ → выгрузки → пакет документов → вопросы агенту), роль
-наблюдателя, разделение входа администратора и ИИ-режим на мок-сервере. Те же тесты, сборка интерфейса и сборка
-Docker-образа запускаются в GitHub Actions (`.github/workflows/ci.yml`).
+наблюдателя, разделение входа администратора и ИИ-режим на мок-сервере. Те же тесты, сборка интерфейса, сборка
+Docker-образа и тесты второго прототипа AI-NAM запускаются в GitHub Actions (`.github/workflows/ci.yml`).
 
 ## 9. Данные и интеграции
 
@@ -338,6 +351,24 @@ Docker-образа запускаются в GitHub Actions (`.github/workflows
 ## 11. Deployed-версия
 
 Публично развёрнутой версии нет. Запуск: локально или в Docker ([раздел 7](#7-установка-и-запуск)).
+
+## Второй прототип: AI-NAM
+
+Облегчённое приложение команды на FastAPI и SQLite с интерфейсом RU/ҚАЗ без Node.js: сравнение комплектов документов
+«до/после», матрица функций, риски и выводы с источниками, решение аналитика, выгрузка в Word, Excel, HTML и JSON,
+локальный ИИ через Ollama. Код не пересекается с OrgStruct AI. Полное описание: [docs/AI-NAM.md](docs/AI-NAM.md).
+
+```bash
+python3 -m venv .venv-ainam
+.venv-ainam/bin/python -m pip install -r requirements.lock.txt
+.venv-ainam/bin/python run.py                          # http://127.0.0.1:8765
+.venv-ainam/bin/python -m unittest discover -v         # 28 тестов (каталог tests/)
+```
+
+Windows: корневой `start.ps1` запускает AI-NAM; OrgStruct AI запускается через `scripts\start.ps1`.
+Первого администратора AI-NAM создают на компьютере сервера, паролей по умолчанию нет. Переменные AI-NAM
+(`AI_*`, `AI_NAM_*`) собраны во втором блоке `.env.example`. Оба приложения по умолчанию хранят данные в `./data`
+в разных файлах (`app.db` и `app.sqlite3`). Отдельный каталог задаётся через `DATA_DIR` или `AI_NAM_DATA_DIR`.
 
 ---
 

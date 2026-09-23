@@ -1,12 +1,17 @@
 # Python
 .venv/
+.venv-ainam/
 __pycache__/
-*.pyc
+*.py[cod]
 .pytest_cache/
 
 # Runtime data (uploads, SQLite DB, generated documents)
 data/
 backend/data/
+
+# AI-NAM: тестовые базы и журналы
+artifacts/
+*.log
 
 # Frontend
 frontend/node_modules/

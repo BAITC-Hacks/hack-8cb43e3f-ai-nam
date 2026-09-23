@@ -1,0 +1,8 @@
+# Replace the hostname and use the certificate issued by your organization.
+ai-nam.internal {
+    tls C:/certs/ai-nam.crt C:/certs/ai-nam.key
+    request_body {
+        max_size 101MB
+    }
+    reverse_proxy 127.0.0.1:8765
+}
