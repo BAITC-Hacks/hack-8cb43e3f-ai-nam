@@ -1,0 +1,66 @@
+# Запуск:            docker compose up -d --build        → http://localhost:8000
+# С локальной моделью: docker compose --profile ollama up -d --build
+#   (скачает модель LLM_MODEL и embedding-модель LLM_EMBED_MODEL в том ollama)
+# Параметры берутся из файла .env рядом (см. .env.example); без него используются значения по умолчанию.
+
+services:
+  app:
+    build: .
+    image: orgstruct-ai:latest
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    environment:
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin12345}
+      SECRET_KEY: ${SECRET_KEY:-}
+      SEED_DEMO: ${SEED_DEMO:-true}
+      LLM_PROVIDER: ${LLM_PROVIDER:-none}
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://ollama:11434/v1}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-qwen2.5:7b-instruct}
+      LLM_VISION_MODEL: ${LLM_VISION_MODEL:-}
+      LLM_EMBED_MODEL: ${LLM_EMBED_MODEL:-}
+      LLM_TIMEOUT: ${LLM_TIMEOUT:-180}
+      DATABASE_URL: ${DATABASE_URL:-}
+    volumes:
+      - app-data:/data
+    extra_hosts:
+      # позволяет обращаться к Ollama/LM Studio, запущенным на хосте: http://host.docker.internal:11434/v1
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["ollama"]
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama:/root/.ollama
+    restart: unless-stopped
+    # Для GPU (NVIDIA Container Toolkit) раскомментируйте:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices: [{ driver: nvidia, count: all, capabilities: [gpu] }]
+
+  ollama-pull:
+    image: ollama/ollama:latest
+    profiles: ["ollama"]
+    depends_on: [ollama]
+    environment:
+      OLLAMA_HOST: ollama:11434
+    volumes:
+      - ollama:/root/.ollama
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        sleep 5 &&
+        ollama pull ${LLM_MODEL:-qwen2.5:7b-instruct} &&
+        (test -z "${LLM_EMBED_MODEL:-}" || ollama pull ${LLM_EMBED_MODEL}) &&
+        (test -z "${LLM_VISION_MODEL:-}" || ollama pull ${LLM_VISION_MODEL}) &&
+        echo "models ready"
+    restart: "no"
+
+volumes:
+  app-data:
+  ollama:

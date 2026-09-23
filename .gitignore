@@ -1,9 +1,27 @@
+# Python
 .venv/
+.venv-ainam/
 __pycache__/
 *.py[cod]
-.env
 .pytest_cache/
+
+# Runtime data (uploads, SQLite DB, generated documents)
 data/
+backend/data/
+
+# AI-NAM: тестовые базы и журналы
 artifacts/
 *.log
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# Local env
+.env
+
+# OS / IDE
 .DS_Store
+.idea/
+.vscode/
+*.tsbuildinfo

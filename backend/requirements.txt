@@ -1,0 +1,27 @@
+# Web
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+pydantic==2.10.4
+pydantic-settings==2.7.1
+SQLAlchemy==2.0.36
+PyJWT==2.10.1
+# PostgreSQL через DATABASE_URL=postgresql+psycopg://… (по умолчанию SQLite)
+psycopg[binary]==3.2.13
+httpx==0.28.1
+
+# Documents
+python-docx==1.1.2
+openpyxl==3.1.5
+PyMuPDF==1.25.1
+pillow==11.1.0
+
+# OCR / computer vision (Tesseract binary is installed separately)
+opencv-python-headless==4.10.0.84
+pytesseract==0.3.13
+numpy==2.2.1
+
+# Text similarity
+scikit-learn==1.6.0
+rapidfuzz==3.11.0
+snowballstemmer==2.2.0
