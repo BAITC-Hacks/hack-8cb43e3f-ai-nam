@@ -224,7 +224,7 @@ function Summary({ run }: { run: Run }) {
             {(us.created || us.merged) ? <Tag color="green">{t('analysis.cards.created')}: {(us.created || 0) + (us.merged || 0)}</Tag> : null}
             {us.abolished ? <Tag color="red">{t('analysis.cards.abolished')}: {us.abolished}</Tag> : null}
             {(us.reorganized || us.split) ? <Tag color="orange">{t('analysis.cards.reorganized')}: {(us.reorganized || 0) + (us.split || 0)}</Tag> : null}
-            {us.renamed ? <Tag color="blue">{t('unitStatus.renamed')}: {us.renamed}</Tag> : null}
+            {us.renamed ? <Tag color="blue">{t('unitStatus.renamed').toLowerCase()}: {us.renamed}</Tag> : null}
             <Tag>{t('analysis.cards.preserved')}: {us.preserved || 0}</Tag>
           </Space>
         </Card>
