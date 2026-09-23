@@ -1,0 +1,22 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Runtime data (uploads, SQLite DB, generated documents)
+data/
+backend/data/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# Local env
+.env
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+*.tsbuildinfo
