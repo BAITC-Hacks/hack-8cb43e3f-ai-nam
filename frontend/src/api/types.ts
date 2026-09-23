@@ -22,6 +22,7 @@ export interface Meta {
   pdf_export: boolean
   formats: string[]
   demo_available: boolean
+  demo_sets: { key: string; name: string }[]
   max_upload_mb: number
 }
 

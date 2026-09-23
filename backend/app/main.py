@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from pathlib import Path
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -62,8 +61,10 @@ def health() -> dict:
 @app.get("/api/meta")
 def meta(db: Session = Depends(get_db)) -> dict:
     """Возможности текущей установки (для интерфейса)."""
+    from .services.demo import available_sets
+
     llm = LLMClient(get_setting(db, "llm"))
-    demo_dir = Path(__file__).resolve().parents[2] / "samples" / "demo"
+    demo_sets = available_sets()
     return {
         "app_name": settings.app_name,
         "version": __version__,
@@ -72,7 +73,8 @@ def meta(db: Session = Depends(get_db)) -> dict:
         "ocr": tesseract_available(),
         "pdf_export": soffice_available(),
         "formats": sorted(SUPPORTED),
-        "demo_available": demo_dir.exists(),
+        "demo_available": bool(demo_sets),
+        "demo_sets": demo_sets,
         "max_upload_mb": settings.max_upload_mb,
     }
 

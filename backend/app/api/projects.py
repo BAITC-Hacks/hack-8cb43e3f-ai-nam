@@ -103,11 +103,15 @@ def create_project(data: ProjectIn, request: Request, db: Session = Depends(get_
 
 
 @router.post("/projects/demo")
-def create_demo(request: Request, db: Session = Depends(get_db), user: User = Depends(require_editor)) -> dict[str, Any]:
+def create_demo(request: Request, key: str = "telecom", db: Session = Depends(get_db),
+                user: User = Depends(require_editor)) -> dict[str, Any]:
     from ..services.demo import create_demo_project
 
-    p = create_demo_project(db, user.id)
-    log_action(db, user, "demo_created", "project", p.id, {}, client_ip(request))
+    try:
+        p = create_demo_project(db, user.id, key)
+    except ValueError as exc:
+        raise HTTPException(404, str(exc))
+    log_action(db, user, "demo_created", "project", p.id, {"set": key}, client_ip(request))
     return project_out(db, p)
 
 

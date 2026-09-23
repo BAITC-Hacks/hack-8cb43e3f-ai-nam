@@ -42,15 +42,15 @@ def seed(db: Session) -> None:
 
 def _demo_background() -> None:
     from .agent import start_analysis
-    from .demo import create_demo_project, demo_available
+    from .demo import available_sets, create_demo_project
 
-    if not demo_available():
-        return
     db = SessionLocal()
     try:
         owner = db.query(User).filter(User.role == Role.ANALYST).first() or db.query(User).first()
-        project = create_demo_project(db, owner.id if owner else None)
-        start_analysis(db, project, owner.id if owner else None, {"use_llm": True}, background=False)
+        # сначала документы организатора, затем синтетический комплект (он окажется первым в списке)
+        for spec in sorted(available_sets(), key=lambda s: 0 if s["key"] == "audit" else 1):
+            project = create_demo_project(db, owner.id if owner else None, spec["key"])
+            start_analysis(db, project, owner.id if owner else None, {"use_llm": True}, background=False)
     except Exception:  # noqa: BLE001 - демо не должно мешать запуску
         log.exception("Не удалось создать демо-проект")
     finally:

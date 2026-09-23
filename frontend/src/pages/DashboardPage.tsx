@@ -1,10 +1,10 @@
 import {
-  CloudUploadOutlined, DeleteOutlined, ExperimentOutlined, FileDoneOutlined, FolderAddOutlined,
+  CloudUploadOutlined, DeleteOutlined, DownOutlined, ExperimentOutlined, FileDoneOutlined, FolderAddOutlined,
   PlusOutlined, SearchOutlined, ThunderboltOutlined,
 } from '@ant-design/icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  Badge, Button, Card, Col, Empty, Form, Input, Modal, Popconfirm, Progress, Row, Space, Steps, Tag, Tooltip,
+  Badge, Button, Card, Col, Dropdown, Empty, Form, Input, Modal, Popconfirm, Progress, Row, Space, Steps, Tag, Tooltip,
   Typography, App as AntApp,
 } from 'antd'
 import dayjs from 'dayjs'
@@ -121,7 +121,7 @@ export default function DashboardPage() {
     refetchInterval: (query) => (query.state.data?.some((p) => p.last_run && ['pending', 'running'].includes(p.last_run.status)) ? 2000 : false),
   })
   const demo = useMutation({
-    mutationFn: () => api<Project>('/projects/demo', { method: 'POST' }),
+    mutationFn: (key: string) => api<Project>(`/projects/demo?key=${key}`, { method: 'POST' }),
     onSuccess: (p) => {
       qc.invalidateQueries({ queryKey: ['projects'] })
       nav(`/projects/${p.id}/documents`)
@@ -132,7 +132,13 @@ export default function DashboardPage() {
     () => (projects.data || []).filter((p) => !q || (p.name + p.description).toLowerCase().includes(q.toLowerCase())),
     [projects.data, q],
   )
-  const demoProject = projects.data?.find((p) => p.is_demo)
+  // демо-комплекты: открываем существующий проект или создаём новый
+  const openDemo = (set: { key: string; name: string }) => {
+    const existing = projects.data?.find((p) => p.is_demo && p.name === set.name)
+    if (existing) nav(`/projects/${existing.id}/analysis`)
+    else if (editable) demo.mutate(set.key)
+  }
+  const demoSets = meta.data?.demo_sets || []
 
   return (
     <div className="page">
@@ -147,18 +153,16 @@ export default function DashboardPage() {
               {editable && (
                 <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>{t('nav.newProject')}</Button>
               )}
-              {demoProject ? (
-                <Button icon={<ExperimentOutlined />} onClick={() => nav(`/projects/${demoProject.id}/analysis`)}>
-                  {t('dashboard.demo')}
-                </Button>
-              ) : (
-                editable && meta.data?.demo_available && (
+              {demoSets.length > 0 && (
+                <Dropdown trigger={['click']} menu={{
+                  items: demoSets.map((d) => ({ key: d.key, label: d.name, onClick: () => openDemo(d) })),
+                }}>
                   <Tooltip title={t('dashboard.demoHint')}>
-                    <Button icon={<ExperimentOutlined />} loading={demo.isPending} onClick={() => demo.mutate()}>
-                      {t('dashboard.demo')}
+                    <Button icon={<ExperimentOutlined />} loading={demo.isPending}>
+                      {t('dashboard.demo')} <DownOutlined />
                     </Button>
                   </Tooltip>
-                )
+                </Dropdown>
               )}
             </Space>
           </Col>
