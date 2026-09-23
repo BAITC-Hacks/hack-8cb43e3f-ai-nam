@@ -19,7 +19,9 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
 from ..analysis.compare import FN_STATUS_LABELS
-from ..analysis.conclusion import T, ref_for
+from ..analysis.conclusion import T, build_conclusion, ref_for
+from ..analysis.recommend import recommendation_text
+from .xlsx import literal_cells
 
 SEV_RU = {"high": "высокая", "medium": "средняя", "low": "низкая", "info": "инфо"}
 SEV_KZ = {"high": "жоғары", "medium": "орташа", "low": "төмен", "info": "ақпарат"}
@@ -177,23 +179,64 @@ def conclusion_docx(conclusion: dict[str, Any], result: dict[str, Any], lang: st
     return buf.getvalue()
 
 
+XLSX = {
+    "ru": {
+        "sheet_map": "Сопоставление функций", "sheet_units": "Подразделения", "sheet_findings": "Выводы",
+        "map_head": ["ID", "Статус", "Сходство", "Подразделение «до»", "Функция «до»", "Источник «до»",
+                     "Подразделение «после»", "Функция «после»", "Источник «после»", "Проверка ИИ", "Вывод"],
+        "units_head": ["Статус", "До", "После", "Функций (до)", "Не найдено", "Покрытие в том же подразделении",
+                       "Куда переданы"],
+        "findings_head": ["ID", "Тип", "Значимость", "Вывод", "Подразделения", "Источники", "Рекомендация", "Метод",
+                          "Комментарий ИИ"],
+        "types": {"loss": "Потеря функции", "duplication": "Дублирование", "conflict": "Конфликт интересов",
+                  "reorganization": "Изменение структуры", "improvement": "Улучшение",
+                  "requirement_gap": "Пробел в требованиях", "benchmark": "Практика операторов"},
+    },
+    "kz": {
+        "sheet_map": "Функцияларды салыстыру", "sheet_units": "Бөлімшелер", "sheet_findings": "Қорытындылар",
+        "map_head": ["ID", "Мәртебе", "Ұқсастық", "«Дейінгі» бөлімше", "«Дейінгі» функция", "«Дейінгі» дереккөз",
+                     "«Кейінгі» бөлімше", "«Кейінгі» функция", "«Кейінгі» дереккөз", "ЖИ тексеруі", "Қорытынды"],
+        "units_head": ["Мәртебе", "Дейін", "Кейін", "Функциялар (дейін)", "Табылмады", "Сол бөлімшедегі қамту",
+                       "Қайда берілді"],
+        "findings_head": ["ID", "Түрі", "Маңыздылығы", "Қорытынды", "Бөлімшелер", "Дереккөздер", "Ұсыным", "Әдіс",
+                          "ЖИ түсіндірмесі"],
+        "types": {"loss": "Функцияның жоғалуы", "duplication": "Қайталану", "conflict": "Мүдделер қақтығысы",
+                  "reorganization": "Құрылымның өзгеруі", "improvement": "Жақсару",
+                  "requirement_gap": "Талаптардағы олқылық", "benchmark": "Операторлар тәжірибесі"},
+    },
+}
+
+
 def function_map_xlsx(result: dict[str, Any], lang: str = "ru") -> bytes:
+    lang = lang if lang in XLSX else "ru"
+    x = XLSX[lang]
+    fn_labels = FN_STATUS_KZ if lang == "kz" else FN_STATUS_LABELS
+    sev = SEV_KZ if lang == "kz" else SEV_RU
+    # формулировки выводов на казахском берём из заключения (шаблоны T["kz"]); цитаты документов не переводятся
+    titles: dict[str, str] = {}
+    if lang != "ru":
+        concl = build_conclusion(result, result.get("documents", []), lang)
+        for sec in concl["sections"]:
+            if sec["id"] == "recommendations":
+                continue
+            for it in sec["items"]:
+                if it.get("finding_id"):
+                    titles.setdefault(it["finding_id"], it["text"])
+
     wb = Workbook()
     ws = wb.active
-    ws.title = "Сопоставление функций"
-    header = ["ID", "Статус", "Сходство", "Подразделение «до»", "Функция «до»", "Источник «до»",
-              "Подразделение «после»", "Функция «после»", "Источник «после»", "Проверка ИИ", "Вывод"]
-    ws.append(header)
+    ws.title = x["sheet_map"]
+    ws.append(x["map_head"])
     fills = {"lost": "F5B7B1", "new": "ABEBC6", "transferred": "FAD7A0", "modified": "F9E79F", "relocated": "D6EAF8"}
     for row in result["function_map"]:
         b = row.get("before") or {}
         a = row["after"][0] if row.get("after") else {}
         verified = row.get("verified") or {}
         ws.append([
-            row["id"], FN_STATUS_LABELS.get(row["status"], row["status"]), row["score"],
-            b.get("unit", ""), b.get("text", ""), ref_for(b, "ru") if b else "",
+            row["id"], fn_labels.get(row["status"], row["status"]), row["score"],
+            b.get("unit", ""), b.get("text", ""), ref_for(b, lang) if b else "",
             a.get("unit", "") if row["status"] != "lost" else "", a.get("text", "") if row["status"] != "lost" else "",
-            ref_for(a, "ru") if a and row["status"] != "lost" else "",
+            ref_for(a, lang) if a and row["status"] != "lost" else "",
             f"{verified.get('verdict', '')}: {verified.get('reason', '')}" if verified else "",
             row.get("finding_id", ""),
         ])
@@ -211,11 +254,11 @@ def function_map_xlsx(result: dict[str, Any], lang: str = "ru") -> bytes:
     ws.freeze_panes = "A2"
     ws.auto_filter.ref = ws.dimensions
 
-    ws2 = wb.create_sheet("Подразделения")
-    ws2.append(["Статус", "До", "После", "Функций (до)", "Не найдено", "Покрытие в том же подразделении", "Куда переданы"])
+    ws2 = wb.create_sheet(x["sheet_units"])
+    ws2.append(x["units_head"])
     for u in result["units"]:
         ws2.append([
-            T["ru"]["status"].get(u["status"], u["status"]),
+            T[lang]["status"].get(u["status"], u["status"]),
             (u["before"]["name"] + (f" ({u['before']['short']})" if u["before"].get("short") else "")) if u["before"] else "",
             ", ".join(a["name"] for a in u["after"]),
             u.get("functions_total"), u.get("functions_lost"), u.get("coverage"),
@@ -226,13 +269,14 @@ def function_map_xlsx(result: dict[str, Any], lang: str = "ru") -> bytes:
     for i, w in enumerate([18, 45, 45, 12, 12, 16, 70], start=1):
         ws2.column_dimensions[get_column_letter(i)].width = w
 
-    ws3 = wb.create_sheet("Выводы")
-    ws3.append(["ID", "Тип", "Значимость", "Вывод", "Подразделения", "Источники", "Рекомендация", "Метод",
-                "Комментарий ИИ"])
+    ws3 = wb.create_sheet(x["sheet_findings"])
+    ws3.append(x["findings_head"])
     for f in result["findings"]:
+        rec = (recommendation_text(f, result["units"], lang) if lang != "ru" else "") or f.get("recommendation", "")
         ws3.append([
-            f["id"], f["type"], SEV_RU.get(f["severity"], f["severity"]), f["title"], ", ".join(f.get("units", [])),
-            "\n".join(ref_for(e, "ru") for e in f.get("evidence", [])[:5]), f.get("recommendation", ""),
+            f["id"], x["types"].get(f["type"], f["type"]), sev.get(f["severity"], f["severity"]),
+            titles.get(f["id"], f["title"]), ", ".join(f.get("units", [])),
+            "\n".join(ref_for(e, lang) for e in f.get("evidence", [])[:5]), rec,
             f.get("method", ""), f.get("llm_note", ""),
         ])
     for c in ws3[1]:
@@ -244,7 +288,7 @@ def function_map_xlsx(result: dict[str, Any], lang: str = "ru") -> bytes:
             c.alignment = Alignment(wrap_text=True, vertical="top")
 
     buf = io.BytesIO()
-    wb.save(buf)
+    literal_cells(wb).save(buf)
     return buf.getvalue()
 
 

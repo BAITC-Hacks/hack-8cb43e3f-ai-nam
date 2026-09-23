@@ -14,6 +14,7 @@ from typing import Any
 
 from ..services.llm import LLMClient, LLMError
 from . import prompts
+from .recommend import recommendation_text
 from .text import short
 
 SEV_ORDER = {"high": 0, "medium": 1, "low": 2, "info": 3}
@@ -276,7 +277,8 @@ def build_conclusion(result: dict[str, Any], docs: list[dict[str, Any]], lang: s
     rec_items = []
     for f in sorted(findings, key=lambda f: SEV_ORDER.get(f["severity"], 9)):
         if f.get("recommendation") and f["severity"] != "info":
-            rec_items.append(_item(f, f["recommendation"] if lang == "ru" else f["recommendation"], lang, reviews))
+            text = recommendation_text(f, result["units"], lang) if lang != "ru" else ""
+            rec_items.append(_item(f, text or f["recommendation"], lang, reviews))
     sections.append({"id": "recommendations", "title": t["s_recs"], "paragraphs": [], "items": rec_items[:25]})
 
     # 10. Ограничения

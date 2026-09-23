@@ -7,11 +7,13 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAdminAuth } from '../auth/AuthContext'
+import { ChangePasswordModal } from './AppLayout'
 import { Brand, LangSwitch } from './common'
 
 export default function AdminLayout() {
   const { t } = useTranslation()
-  const { user, logout } = useAdminAuth()
+  const { user, logout, refresh } = useAdminAuth()
+  const forced = !!user?.must_change_password
   const nav = useNavigate()
   const loc = useLocation()
   const [collapsed, setCollapsed] = useState(false)
@@ -53,10 +55,12 @@ export default function AdminLayout() {
         </Layout.Header>
         <Layout.Content>
           <div className="page">
-            <Outlet />
+            {!forced && <Outlet />}
           </div>
         </Layout.Content>
       </Layout>
+      <ChangePasswordModal open={forced} forced scope="admin" onClose={() => refresh()}
+        onLogout={() => { logout(); nav('/admin/login') }} />
     </Layout>
   )
 }

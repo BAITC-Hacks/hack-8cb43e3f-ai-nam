@@ -42,6 +42,24 @@ def test_admin_scope_separation(client):
     assert client.post("/api/auth/login", json={"email": "a1@example.com", "password": "bad"}).status_code == 401
 
 
+def test_temporary_password_must_be_changed(client):
+    adm_h = login(client, admin=True)
+    r = client.post("/api/admin/users", headers=adm_h, json={"email": "tmp@example.com", "role": "admin"})
+    temp = r.json()["temporary_password"]
+    app_h = login(client, "tmp@example.com", temp)
+    adm2_h = login(client, "tmp@example.com", temp, admin=True)
+    # с временным паролем доступны только профиль и смена пароля — в обоих разделах
+    assert client.get("/api/projects", headers=app_h).status_code == 403
+    assert client.get("/api/admin/stats", headers=adm2_h).status_code == 403
+    assert client.get("/api/auth/me", headers=app_h).json()["must_change_password"] is True
+    assert client.get("/api/auth/admin/me", headers=adm2_h).status_code == 200
+    r = client.post("/api/auth/change-password", headers=adm2_h,
+                    json={"old_password": temp, "new_password": "newpassword1"})
+    assert r.status_code == 200
+    assert client.get("/api/projects", headers=app_h).status_code == 200
+    assert client.get("/api/admin/stats", headers=adm2_h).status_code == 200
+
+
 def _wait(client, h, run_id, timeout=120):
     t0 = time.time()
     while time.time() - t0 < timeout:
@@ -96,7 +114,21 @@ def test_viewer_is_read_only(client):
     client.post("/api/admin/users", headers=adm, json={"email": "v@example.com", "role": "viewer", "password": "viewer123"})
     h = login(client, "v@example.com", "viewer123")
     assert client.post("/api/projects", headers=h, json={"name": "x"}).status_code == 403
-    assert client.get("/api/projects", headers=h).status_code == 200
+    projects = client.get("/api/projects", headers=h).json()
+    assert projects and not any(p["can_delete"] for p in projects)
+
+
+def test_analyst_can_delete_only_own_projects(client):
+    adm = login(client, admin=True)
+    client.post("/api/admin/users", headers=adm, json={"email": "a2@example.com", "role": "analyst",
+                                                        "password": "password123"})
+    h = login(client, "a2@example.com", "password123")
+    foreign = client.post("/api/projects", headers=login(client), json={"name": "Чужой"}).json()
+    own = client.post("/api/projects", headers=h, json={"name": "Свой"}).json()
+    flags = {p["id"]: p["can_delete"] for p in client.get("/api/projects", headers=h).json()}
+    assert flags[own["id"]] is True and flags[foreign["id"]] is False
+    assert client.delete(f"/api/projects/{foreign['id']}", headers=h).status_code == 403
+    assert client.delete(f"/api/projects/{own['id']}", headers=h).status_code == 200
 
 
 def test_llm_mode_with_mock_server(client):

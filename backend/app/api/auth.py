@@ -10,7 +10,7 @@ from ..core.security import create_access_token, hash_password, verify_password
 from ..db import get_db
 from ..models import Role, User
 from ..services.audit import log_action
-from .deps import client_ip, current_admin, current_user
+from .deps import client_ip, current_admin_any, current_user_any, current_user_either
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -75,17 +75,17 @@ def admin_login(data: LoginIn, request: Request, db: Session = Depends(get_db)) 
 
 
 @router.get("/me")
-def me(user: User = Depends(current_user)) -> dict:
+def me(user: User = Depends(current_user_any)) -> dict:
     return user_out(user)
 
 
 @router.get("/admin/me")
-def admin_me(user: User = Depends(current_admin)) -> dict:
+def admin_me(user: User = Depends(current_admin_any)) -> dict:
     return user_out(user)
 
 
 @router.patch("/me")
-def update_me(data: ProfileIn, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
+def update_me(data: ProfileIn, user: User = Depends(current_user_any), db: Session = Depends(get_db)) -> dict:
     if data.full_name is not None:
         user.full_name = data.full_name.strip()[:255]
     if data.language in ("ru", "kz"):
@@ -95,7 +95,7 @@ def update_me(data: ProfileIn, user: User = Depends(current_user), db: Session =
 
 
 @router.post("/change-password")
-def change_password(data: ChangePasswordIn, request: Request, user: User = Depends(current_user),
+def change_password(data: ChangePasswordIn, request: Request, user: User = Depends(current_user_either),
                     db: Session = Depends(get_db)) -> dict:
     if not verify_password(data.old_password, user.password_hash):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Текущий пароль указан неверно")

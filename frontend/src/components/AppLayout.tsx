@@ -1,13 +1,16 @@
 import { KeyOutlined, LogoutOutlined, QuestionCircleOutlined, SafetyOutlined, UserOutlined } from '@ant-design/icons'
-import { Avatar, Dropdown, Form, Input, Layout, Menu, Modal, Space, Tag, App as AntApp } from 'antd'
+import { Alert, Avatar, Dropdown, Form, Input, Layout, Menu, Modal, Space, Tag, App as AntApp } from 'antd'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { api } from '../api/client'
+import { api, type Scope } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
 import { AiBadge, Brand, LangSwitch } from './common'
 
-export function ChangePasswordModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+/** Смена пароля. forced — временный пароль от администратора: окно нельзя закрыть, только сменить пароль или выйти. */
+export function ChangePasswordModal({ open, onClose, scope = 'app', forced = false, onLogout }: {
+  open: boolean; onClose: () => void; scope?: Scope; forced?: boolean; onLogout?: () => void
+}) {
   const { t } = useTranslation()
   const { message } = AntApp.useApp()
   const [form] = Form.useForm()
@@ -16,13 +19,17 @@ export function ChangePasswordModal({ open, onClose }: { open: boolean; onClose:
     <Modal
       open={open}
       title={t('common.changePassword')}
-      onCancel={onClose}
+      onCancel={forced ? onLogout : onClose}
+      cancelText={forced ? t('common.logout') : undefined}
+      closable={!forced}
+      maskClosable={!forced}
+      keyboard={!forced}
       confirmLoading={busy}
       onOk={async () => {
         const v = await form.validateFields()
         setBusy(true)
         try {
-          await api('/auth/change-password', { body: v })
+          await api('/auth/change-password', { body: v, scope })
           message.success(t('common.passwordChanged'))
           form.resetFields()
           onClose()
@@ -33,6 +40,7 @@ export function ChangePasswordModal({ open, onClose }: { open: boolean; onClose:
         }
       }}
     >
+      {forced && <Alert type="warning" showIcon message={t('common.mustChangePassword')} style={{ marginBottom: 16 }} />}
       <Form form={form} layout="vertical">
         <Form.Item name="old_password" label={t('common.oldPassword')} rules={[{ required: true }]}>
           <Input.Password autoComplete="current-password" />
@@ -50,8 +58,9 @@ export default function AppLayout() {
   const { user, logout, refresh } = useAuth()
   const nav = useNavigate()
   const loc = useLocation()
-  // после сброса пароля администратором пользователь сразу задаёт свой
-  const [pwdOpen, setPwdOpen] = useState(!!user?.must_change_password)
+  // после сброса пароля администратором пользователь сначала задаёт свой (сервер до этого отвечает 403)
+  const forced = !!user?.must_change_password
+  const [pwdOpen, setPwdOpen] = useState(false)
   const selected = loc.pathname.startsWith('/help') ? 'help' : 'projects'
 
   const items = [
@@ -93,9 +102,10 @@ export default function AppLayout() {
         </Space>
       </Layout.Header>
       <Layout.Content>
-        <Outlet />
+        {!forced && <Outlet />}
       </Layout.Content>
-      <ChangePasswordModal open={pwdOpen} onClose={() => { setPwdOpen(false); refresh() }} />
+      <ChangePasswordModal open={pwdOpen || forced} forced={forced} onClose={() => { setPwdOpen(false); refresh() }}
+        onLogout={() => { logout(); nav('/login') }} />
     </Layout>
   )
 }

@@ -47,7 +47,7 @@ export function NewProjectModal({ open, onClose }: { open: boolean; onClose: () 
   )
 }
 
-function ProjectCard({ p, editable }: { p: Project; editable: boolean }) {
+function ProjectCard({ p }: { p: Project }) {
   const { t } = useTranslation()
   const nav = useNavigate()
   const qc = useQueryClient()
@@ -61,7 +61,7 @@ function ProjectCard({ p, editable }: { p: Project; editable: boolean }) {
   return (
     <Card hoverable onClick={() => nav(`/projects/${p.id}`)} style={{ height: '100%' }}
       title={<Space>{p.is_demo && <Tag color="purple">DEMO</Tag>}<span>{p.name}</span></Space>}
-      extra={editable && (
+      extra={p.can_delete && (
         <Popconfirm title={t('project.deleteConfirm')} onConfirm={(e) => { e?.stopPropagation(); del.mutate() }}
           onCancel={(e) => e?.stopPropagation()}>
           <Button type="text" size="small" danger icon={<DeleteOutlined />} onClick={(e) => e.stopPropagation()} />
@@ -195,7 +195,7 @@ export default function DashboardPage() {
         <Row gutter={[16, 16]}>
           {list.map((p) => (
             <Col key={p.id} xs={24} md={12} xl={8}>
-              <ProjectCard p={p} editable={editable} />
+              <ProjectCard p={p} />
             </Col>
           ))}
         </Row>

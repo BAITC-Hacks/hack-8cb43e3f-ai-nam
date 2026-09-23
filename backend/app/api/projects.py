@@ -64,7 +64,11 @@ class PreviewIn(BaseModel):
     include_sources: bool = True
 
 
-def project_out(db: Session, p: Project) -> dict[str, Any]:
+def can_delete_project(user: User, p: Project) -> bool:
+    return user.role == Role.ADMIN or (user.role == Role.ANALYST and p.owner_id in (None, user.id))
+
+
+def project_out(db: Session, p: Project, user: User) -> dict[str, Any]:
     counts = dict(db.query(Document.side, func.count(Document.id)).filter(Document.project_id == p.id)
                   .group_by(Document.side).all())
     run = db.query(AnalysisRun).filter_by(project_id=p.id).order_by(AnalysisRun.id.desc()).first()
@@ -81,6 +85,7 @@ def project_out(db: Session, p: Project) -> dict[str, Any]:
         "created_at": p.created_at.isoformat() if p.created_at else None,
         "updated_at": p.updated_at.isoformat() if p.updated_at else None,
         "documents": {s: counts.get(s, 0) for s in SIDES}, "last_run": last,
+        "can_delete": can_delete_project(user, p),
     }
 
 
@@ -89,7 +94,7 @@ def project_out(db: Session, p: Project) -> dict[str, Any]:
 
 @router.get("/projects")
 def list_projects(db: Session = Depends(get_db), user: User = Depends(current_user)) -> list[dict[str, Any]]:
-    return [project_out(db, p) for p in db.query(Project).order_by(Project.updated_at.desc()).all()]
+    return [project_out(db, p, user) for p in db.query(Project).order_by(Project.updated_at.desc()).all()]
 
 
 @router.post("/projects")
@@ -99,7 +104,7 @@ def create_project(data: ProjectIn, request: Request, db: Session = Depends(get_
     db.add(p)
     db.commit()
     log_action(db, user, "project_created", "project", p.id, {"name": p.name}, client_ip(request))
-    return project_out(db, p)
+    return project_out(db, p, user)
 
 
 @router.post("/projects/demo")
@@ -112,12 +117,12 @@ def create_demo(request: Request, key: str = "telecom", db: Session = Depends(ge
     except ValueError as exc:
         raise HTTPException(404, str(exc))
     log_action(db, user, "demo_created", "project", p.id, {"set": key}, client_ip(request))
-    return project_out(db, p)
+    return project_out(db, p, user)
 
 
 @router.get("/projects/{project_id}")
 def get_project(project_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)) -> dict[str, Any]:
-    return project_out(db, get_project_or_404(project_id, db))
+    return project_out(db, get_project_or_404(project_id, db), user)
 
 
 @router.patch("/projects/{project_id}")
@@ -131,14 +136,14 @@ def patch_project(project_id: int, data: ProjectPatch, db: Session = Depends(get
     if data.status in ("draft", "analyzed", "archived"):
         p.status = data.status
     db.commit()
-    return project_out(db, p)
+    return project_out(db, p, user)
 
 
 @router.delete("/projects/{project_id}")
 def delete_project(project_id: int, request: Request, db: Session = Depends(get_db),
                    user: User = Depends(require_editor)) -> dict[str, Any]:
     p = get_project_or_404(project_id, db)
-    if user.role != Role.ADMIN and p.owner_id not in (None, user.id):
+    if not can_delete_project(user, p):
         raise HTTPException(403, "Удалить проект может его автор или администратор")
     name = p.name
     db.delete(p)

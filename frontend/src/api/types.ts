@@ -36,6 +36,7 @@ export interface Project {
   created_at: string
   updated_at: string
   documents: Record<Side, number>
+  can_delete: boolean
   last_run: null | {
     id: number
     status: string

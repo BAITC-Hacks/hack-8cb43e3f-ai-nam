@@ -78,3 +78,44 @@ def test_every_finding_has_source(result):
         assert f["evidence"], f"вывод {f['id']} без источника"
         for e in f["evidence"]:
             assert e.get("doc_id") and e.get("ref_display") is not None
+
+
+def test_kz_recommendations_and_xlsx(result):
+    import copy
+    from io import BytesIO
+
+    from openpyxl import load_workbook
+
+    from app.analysis.conclusion import build_conclusion
+    from app.analysis.recommend import add_recommendations
+    from app.docgen.report import FN_STATUS_KZ, function_map_xlsx
+
+    res = copy.deepcopy(result)
+    add_recommendations(res)
+    ru = {f["id"]: f["recommendation"] for f in res["findings"] if f.get("recommendation")}
+    recs = next(s for s in build_conclusion(res, [], "kz")["sections"] if s["id"] == "recommendations")
+    assert recs["items"]
+    for it in recs["items"]:
+        assert it["text"] != ru[it["finding_id"]]
+        assert any(ch in it["text"] for ch in "әіңғүұқөһ"), it["text"]
+
+    wb = load_workbook(BytesIO(function_map_xlsx(res, "kz")))
+    assert wb.sheetnames == ["Функцияларды салыстыру", "Бөлімшелер", "Қорытындылар"]
+    statuses = {r[1] for r in wb.worksheets[0].iter_rows(min_row=2, values_only=True)}
+    assert statuses <= set(FN_STATUS_KZ.values())
+
+
+def test_xlsx_writes_document_text_literally(result):
+    import copy
+    from io import BytesIO
+
+    from openpyxl import load_workbook
+
+    from app.docgen.report import function_map_xlsx
+
+    res = copy.deepcopy(result)
+    formula = '=HYPERLINK("http://example.com","x")'
+    res["function_map"][0]["before"]["text"] = formula
+    cell = load_workbook(BytesIO(function_map_xlsx(res))).worksheets[0]["E2"]
+    assert cell.value == formula and cell.data_type == "s"
+

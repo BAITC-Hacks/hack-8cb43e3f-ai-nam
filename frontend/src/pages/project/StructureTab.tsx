@@ -120,8 +120,8 @@ function RecognizeModal({ projectId, side, open, onClose, onApply }: {
 
 // ------------------------------------------------------------------ пакет документов
 
-function PackageModal({ projectId, side, units, open, onClose }: {
-  projectId: number; side: 'before' | 'after'; units: OrgUnit[]; open: boolean; onClose: () => void
+function PackageModal({ projectId, side, units, open, onClose, editable }: {
+  projectId: number; side: 'before' | 'after'; units: OrgUnit[]; open: boolean; onClose: () => void; editable: boolean
 }) {
   const { t } = useTranslation()
   const { message } = AntApp.useApp()
@@ -163,7 +163,9 @@ function PackageModal({ projectId, side, units, open, onClose }: {
       <Row gutter={20}>
         <Col span={9}>
           <Alert type="info" showIcon message={t('structure.package.contents')} style={{ marginBottom: 12 }} />
+          {!editable && <Alert type="warning" showIcon message={t('structure.package.viewOnly')} style={{ marginBottom: 12 }} />}
           <Form layout="vertical">
+            {editable && <>
             <Form.Item label={t('structure.package.langs')}>
               <Checkbox.Group value={langs} onChange={(v) => setLangs(v as string[])}
                 options={[{ value: 'ru', label: 'Русский' }, { value: 'kz', label: 'Қазақша' }]} />
@@ -172,13 +174,16 @@ function PackageModal({ projectId, side, units, open, onClose }: {
               <Select mode="multiple" allowClear value={unitIds} onChange={setUnitIds}
                 options={units.map((u) => ({ value: u.id, label: u.short ? `${u.name} (${u.short})` : u.name }))} />
             </Form.Item>
+            </>}
             <Form.Item>
               <Checkbox checked={sources} onChange={(e) => setSources(e.target.checked)}>{t('structure.package.sources')}</Checkbox>
             </Form.Item>
             <Typography.Paragraph type="secondary" className="small">{t('structure.package.kzNote')}</Typography.Paragraph>
-            <Button type="primary" icon={<FileZipOutlined />} loading={busy} disabled={!langs.length} onClick={generate} block>
-              {t('structure.package.generate')}
-            </Button>
+            {editable && (
+              <Button type="primary" icon={<FileZipOutlined />} loading={busy} disabled={!langs.length} onClick={generate} block>
+                {t('structure.package.generate')}
+              </Button>
+            )}
           </Form>
           <Divider orientation="left" plain>{t('structure.package.files')}</Divider>
           <List size="small" dataSource={(files.data || []).slice(0, 6)} locale={{ emptyText: t('common.none') }}
@@ -390,7 +395,9 @@ function SideEditor({ projectId, side }: { projectId: number; side: 'before' | '
           {editable && <Button icon={<CameraOutlined />} onClick={() => setRecOpen(true)}>{t('structure.importChart')}</Button>}
           {editable && <Button icon={<ReloadOutlined />} onClick={rebuild}>{t('structure.rebuild')}</Button>}
           <Button icon={<DownloadOutlined />} onClick={() => download(`/projects/${projectId}/structures/${side}/chart.png`, `chart_${side}.png`)}>{t('structure.exportPng')}</Button>
-          <Button icon={<FileZipOutlined />} onClick={() => setPkgOpen(true)} disabled={!units.length || dirty}>{t('structure.generate')}</Button>
+          <Button icon={<FileZipOutlined />} onClick={() => setPkgOpen(true)} disabled={!units.length || dirty}>
+            {editable ? t('structure.generate') : t('structure.package.title')}
+          </Button>
           {editable && <Button type="primary" icon={<SaveOutlined />} disabled={!dirty} loading={saving} onClick={save}>{t('structure.save')}</Button>}
         </Space>
       </Space>
@@ -413,7 +420,8 @@ function SideEditor({ projectId, side }: { projectId: number; side: 'before' | '
         </Row>
       )}
       <RecognizeModal projectId={projectId} side={side} open={recOpen} onClose={() => setRecOpen(false)} onApply={applyRecognized} />
-      <PackageModal projectId={projectId} side={side} units={units} open={pkgOpen} onClose={() => setPkgOpen(false)} />
+      <PackageModal projectId={projectId} side={side} units={units} open={pkgOpen} onClose={() => setPkgOpen(false)}
+        editable={editable} />
     </>
   )
 }

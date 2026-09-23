@@ -11,14 +11,14 @@ from ..models import Project, Role, User
 bearer = HTTPBearer(auto_error=False)
 
 
-def _user_from_token(token: str | None, db: Session, *, scope: str) -> User:
+def _user_from_token(token: str | None, db: Session, *, scope: str | tuple[str, ...]) -> User:
     if not token:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Требуется авторизация")
     try:
         payload = decode_token(token)
     except Exception:  # noqa: BLE001 - любые ошибки токена = 401
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Сессия истекла, войдите снова")
-    if payload.get("scope") != scope:
+    if payload.get("scope") not in ((scope,) if isinstance(scope, str) else scope):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Токен не подходит для этого раздела")
     user = db.get(User, int(payload["sub"]))
     if not user or not user.is_active:
@@ -26,11 +26,15 @@ def _user_from_token(token: str | None, db: Session, *, scope: str) -> User:
     return user
 
 
-def current_user(
+PASSWORD_CHANGE_REQUIRED = "Смените временный пароль, чтобы продолжить работу"
+
+
+def current_user_any(
     creds: HTTPAuthorizationCredentials | None = Depends(bearer),
     request: Request = None,  # type: ignore[assignment]
     db: Session = Depends(get_db),
 ) -> User:
+    """Пользователь рабочей области, в том числе с временным паролем (профиль и смена пароля)."""
     token = creds.credentials if creds else None
     # Для прямых ссылок на скачивание файлов допускаем токен в query (?token=...)
     if not token and request is not None:
@@ -38,7 +42,18 @@ def current_user(
     return _user_from_token(token, db, scope="app")
 
 
-def current_admin(
+def _require_own_password(user: User) -> User:
+    # временный пароль, выданный администратором, даёт доступ только к смене пароля
+    if user.must_change_password:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, PASSWORD_CHANGE_REQUIRED)
+    return user
+
+
+def current_user(user: User = Depends(current_user_any)) -> User:
+    return _require_own_password(user)
+
+
+def current_admin_any(
     creds: HTTPAuthorizationCredentials | None = Depends(bearer),
     db: Session = Depends(get_db),
 ) -> User:
@@ -46,6 +61,18 @@ def current_admin(
     if user.role != Role.ADMIN:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Доступ только для администратора")
     return user
+
+
+def current_admin(user: User = Depends(current_admin_any)) -> User:
+    return _require_own_password(user)
+
+
+def current_user_either(
+    creds: HTTPAuthorizationCredentials | None = Depends(bearer),
+    db: Session = Depends(get_db),
+) -> User:
+    """Токен рабочей области или панели администратора: для смены собственного пароля из обоих разделов."""
+    return _user_from_token(creds.credentials if creds else None, db, scope=("app", "admin"))
 
 
 def require_editor(user: User = Depends(current_user)) -> User:

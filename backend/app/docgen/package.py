@@ -22,6 +22,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font
 
 from ..orgchart.render import render_chart
+from .xlsx import literal_cells
 
 TYPE_RU = {"department": "департамент", "directorate": "управление", "division": "отдел", "service": "служба",
            "block": "блок", "center": "центр", "sector": "сектор", "group": "группа", "direction": "направление",
@@ -346,7 +347,7 @@ def functions_xlsx(structure: dict[str, Any]) -> bytes:
     for col, w in zip("ABCD", (45, 45, 25, 70)):
         ws2.column_dimensions[col].width = w
     buf = io.BytesIO()
-    wb.save(buf)
+    literal_cells(wb).save(buf)
     return buf.getvalue()
 
 
